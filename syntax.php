@@ -1,15 +1,16 @@
 <?php
 /**
  * Syntax Plugin:
- * 
+ *
  * This plugin lists all users from the given groups in a tabel.
  * Syntax: {{groupusers[|nomail]>group1[,group2[,group3...]]}}
- * 
+ *
  * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
  * @author     Dominik Eckelmann <eckelmann@cosmocode.de>
  */
 
 use dokuwiki\Extension\SyntaxPlugin;
+use dokuwiki\plugin\virtualgroup\VirtualGroups;
 
 class syntax_plugin_groupusers extends DokuWiki_Syntax_Plugin {
 
@@ -47,7 +48,7 @@ class syntax_plugin_groupusers extends DokuWiki_Syntax_Plugin {
             $match = substr($match, 7);
             $data['nomail'] = true;
 		}
-        
+
         $data['grps'] = explode(',', $match);
 		return $data;
     }
@@ -60,19 +61,29 @@ class syntax_plugin_groupusers extends DokuWiki_Syntax_Plugin {
 
         if($mode != 'xhtml') return false;
 
+        if(!plugin_isdisabled('virtualgroup')) {
+            $virtualgroups = new VirtualGroups();
+        }
         $users = array();
         if (empty($data['grps'])) $data['grps'] = $data[0]; // ensures backward compatibility to cached data
         foreach ($data['grps'] as $grp) {
             $grp = trim($grp);
             $getuser = $auth->retrieveUsers(0,-1,array('grps'=>'^'.preg_quote($grp,'/').'$'));
             $users = array_merge($users,$getuser);
+            if($virtualgroups) {
+                $getvuser = $virtualgroups->getGroupUsers($grp);
+                foreach ($getvuser as $user) {
+                    $userData = $auth->getUserData($user);
+                    $users[$user] = $userData;
+                }
+            }
         }
 
         $renderer->doc .= '<table class="inline">';
         $renderer->doc .= '<tr>';
         $renderer->doc .= '<th>'.$lang['user'].'</th>';
         $renderer->doc .= '<th>'.$lang['fullname'].'</th>';
-        
+
         if (empty($data['nomail'])) {
             $renderer->doc .= '<th>'.$lang['email'].'</th>';
         }
